@@ -14,6 +14,7 @@ import {
   RootRouteId,
   TrimPathLeft,
   RouteConstraints,
+  RouteComponentOptions,
 } from './route'
 
 export interface FileRoutesByPath {
@@ -106,8 +107,16 @@ export class FileRoute<
       TRouteContext
     >,
     TRouterContext extends RouteConstraints['TRouterContext'] = AnyContext,
-    TChildren extends RouteConstraints['TChildren'] = unknown,
     TRouteTree extends RouteConstraints['TRouteTree'] = AnyRoute,
+    TOutlets extends string[] = [],
+    TSlots extends Record<
+      string,
+      RouteComponentOptions<TLoader, {}, {}, TRouteContext, {}>
+    > = Record<
+      string,
+      RouteComponentOptions<TLoader, {}, {}, TRouteContext, {}>
+    >,
+    TChildren extends RouteConstraints['TChildren'] = unknown,
   >(
     options: Omit<
       RouteOptions<
@@ -129,11 +138,12 @@ export class FileRoute<
     > &
       UpdatableRouteOptions<
         TLoader,
-        TSearchSchema,
         TFullSearchSchema,
         TAllParams,
         TRouteContext,
-        TContext
+        TContext,
+        TOutlets,
+        TSlots
       >,
   ): Route<
     TParentRoute,
@@ -151,6 +161,8 @@ export class FileRoute<
     TRouteContext,
     TContext,
     TRouterContext,
+    TOutlets,
+    TSlots,
     TChildren,
     TRouteTree
   > => {

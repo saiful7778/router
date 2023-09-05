@@ -37,6 +37,7 @@ import {
   AllParams,
   rootRouteId,
   AnyPathParams,
+  RouteComponentOptions,
 } from '@tanstack/router-core'
 
 declare module '@tanstack/router-core' {
@@ -46,6 +47,7 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
     RouteComponent: RouteComponent<
       RouteProps<
@@ -53,7 +55,8 @@ declare module '@tanstack/router-core' {
         TFullSearchSchema,
         TAllParams,
         TRouteContext,
-        TAllContext
+        TAllContext,
+        TOutlets
       >
     >
   }
@@ -63,9 +66,16 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
     ErrorRouteComponent: RouteComponent<
-      ErrorRouteProps<TFullSearchSchema, TAllParams, TRouteContext, TAllContext>
+      ErrorRouteProps<
+        TFullSearchSchema,
+        TAllParams,
+        TRouteContext,
+        TAllContext,
+        TOutlets
+      >
     >
   }
 
@@ -74,13 +84,15 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
     PendingRouteComponent: RouteComponent<
       PendingRouteProps<
         TFullSearchSchema,
         TAllParams,
         TRouteContext,
-        TAllContext
+        TAllContext,
+        TOutlets
       >
     >
   }
@@ -120,6 +132,28 @@ declare module '@tanstack/router-core' {
       TRouteContext
     >,
     TRouterContext extends RouteConstraints['TRouterContext'] = AnyContext,
+    TOutlets extends string[] = [],
+    TSlots extends Record<
+      TParentRoute['types']['outlets'][number],
+      RouteComponentOptions<
+        TLoader,
+        TFullSearchSchema,
+        TAllParams,
+        TRouteContext,
+        TAllContext,
+        TOutlets
+      >
+    > = Record<
+      TParentRoute['types']['outlets'][number],
+      RouteComponentOptions<
+        TLoader,
+        TFullSearchSchema,
+        TAllParams,
+        TRouteContext,
+        TAllContext,
+        TOutlets
+      >
+    >,
     TChildren extends RouteConstraints['TChildren'] = unknown,
     TRouteTree extends RouteConstraints['TRouteTree'] = AnyRoute,
   > {
@@ -141,6 +175,7 @@ declare module '@tanstack/router-core' {
     useParams: <TSelected = TAllParams>(opts?: {
       select?: (search: TAllParams) => TSelected
     }) => TSelected
+    Outlet: (props?: { slot?: TOutlets[number] }) => any
   }
 
   interface RegisterRouteProps<
@@ -149,13 +184,15 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
     RouteProps: RouteProps<
       TLoader,
       TFullSearchSchema,
       TAllParams,
       TRouteContext,
-      TAllContext
+      TAllContext,
+      TOutlets
     >
   }
 
@@ -164,12 +201,14 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
     PendingRouteProps: PendingRouteProps<
       TFullSearchSchema,
       TAllParams,
       TRouteContext,
-      TAllContext
+      TAllContext,
+      TOutlets
     >
   }
 
@@ -178,8 +217,15 @@ declare module '@tanstack/router-core' {
     TAllParams extends AnyPathParams = AnyPathParams,
     TRouteContext extends AnyContext = AnyContext,
     TAllContext extends AnyContext = AnyContext,
+    TOutlets extends string[] = [],
   > {
-    ErrorRouteProps: ErrorRouteProps
+    ErrorRouteProps: ErrorRouteProps<
+      TFullSearchSchema,
+      TAllParams,
+      TRouteContext,
+      TAllContext,
+      TOutlets
+    >
   }
 }
 
@@ -189,6 +235,7 @@ export type RouteProps<
   TAllParams extends AnyPathParams = AnyPathParams,
   TRouteContext extends AnyContext = AnyContext,
   TAllContext extends AnyContext = AnyContext,
+  TOutlets extends string[] = [],
 > = {
   useLoader: <TSelected = TLoader>(opts?: {
     select?: (search: TLoader) => TSelected
@@ -208,6 +255,7 @@ export type RouteProps<
   useParams: <TSelected = TAllParams>(opts?: {
     select?: (search: TAllParams) => TSelected
   }) => TSelected
+  Outlet: (props?: { slot?: TOutlets[number] }) => any
 }
 
 export type ErrorRouteProps<
@@ -215,6 +263,7 @@ export type ErrorRouteProps<
   TAllParams extends AnyPathParams = AnyPathParams,
   TRouteContext extends AnyContext = AnyContext,
   TAllContext extends AnyContext = AnyContext,
+  TOutlets extends string[] = [],
 > = {
   error: unknown
   info: { componentStack: string }
@@ -224,7 +273,8 @@ export type ErrorRouteProps<
     TFullSearchSchema,
     TAllParams,
     TRouteContext,
-    TAllContext
+    TAllContext,
+    TOutlets
   >,
   'useLoader'
 >
@@ -234,13 +284,15 @@ export type PendingRouteProps<
   TAllParams extends AnyPathParams = AnyPathParams,
   TRouteContext extends AnyContext = AnyContext,
   TAllContext extends AnyContext = AnyContext,
+  TOutlets extends string[] = [],
 > = Omit<
   RouteProps<
     unknown,
     TFullSearchSchema,
     TAllParams,
     TRouteContext,
-    TAllContext
+    TAllContext,
+    TOutlets
   >,
   'useLoader'
 >
@@ -873,7 +925,17 @@ export function MatchRoute<TFrom extends string = '/', TTo extends string = ''>(
   return !!params ? props.children : null
 }
 
-export function Outlet() {
+export function Outlet<
+  TFrom extends RouteIds<RegisteredRouter['routeTree']>,
+  TSlot extends RouteById<
+    RegisteredRouter['routeTree'],
+    TFrom
+  >['types']['outlets'][number],
+>(
+  props?:
+    | { from?: never; slot?: never }
+    | { from: TFrom; slot: TFrom extends string ? TSlot : never },
+) {
   const matchIds = React.useContext(matchIdsContext).slice(1)
 
   if (!matchIds[0]) {
