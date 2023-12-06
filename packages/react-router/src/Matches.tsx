@@ -14,7 +14,7 @@ import {
   RoutePaths,
 } from './routeInfo'
 import { RegisteredRouter } from './router'
-import { NoInfer, StrictOrFrom, pick } from './utils'
+import { NoInfer, StrictOrFrom, deepDiff, pick } from './utils'
 
 export interface RouteMatch<
   TRouteTree extends AnyRoute = AnyRoute,
@@ -47,10 +47,12 @@ export interface RouteMatch<
 export type AnyRouteMatch = RouteMatch<any>
 
 export function Matches() {
-  const { routesById, state } = useRouter()
-  const { matches } = state
+  const { routesById } = useRouter()
+  const matchId = useRouterState({
+    select: (s) => s.matches[0]?.id ?? '',
+  })
 
-  const locationKey = useRouterState().location.state.key
+  // const locationKey = useRouterState({ select: (s) => s.location.state.key })
 
   const route = routesById[rootRouteId]!
 
@@ -68,9 +70,9 @@ export function Matches() {
   )
 
   return (
-    <matchesContext.Provider value={matches}>
+    <matchesContext.Provider value={matchId}>
       <CatchBoundary
-        resetKey={locationKey}
+        // resetKey={locationKey}
         errorComponent={errorComponent}
         onCatch={() => {
           warning(
@@ -79,7 +81,7 @@ export function Matches() {
           )
         }}
       >
-        {matches.length ? <Match matches={matches} /> : null}
+        {matchId ? <Match matchId={matchId} /> : null}
       </CatchBoundary>
     </matchesContext.Provider>
   )
@@ -89,12 +91,27 @@ function SafeFragment(props: any) {
   return <>{props.children}</>
 }
 
-export function Match({ matches }: { matches: RouteMatch[] }) {
-  const { options, routesById } = useRouter()
-  const match = matches[0]!
-  const routeId = match?.routeId
-  const route = routesById[routeId]!
+function useDiffedValue(value: any) {
+  const previousValueRef = React.useRef(value)
+
+  const diffed = deepDiff(previousValueRef.current, value)
+
+  React.useEffect(() => {
+    previousValueRef.current = value
+  })
+
+  return diffed
+}
+
+export function Match({ matchId }: { matchId: string }) {
   const router = useRouter()
+  const { options, routesById } = useRouter()
+
+  const routeId = useRouterState({
+    select: (s) => s.matches.find((d) => d.id === matchId)!.routeId,
+  })
+
+  const route = routesById[routeId]!
   const locationKey = router.latestLocation.state?.key
   // const locationKey = useRouterState().location.state?.key
 
@@ -138,44 +155,58 @@ export function Match({ matches }: { matches: RouteMatch[] }) {
   const ResolvedCatchBoundary = errorComponent ? CatchBoundary : SafeFragment
 
   return (
-    <matchesContext.Provider value={matches}>
+    <matchesContext.Provider value={matchId}>
       <ResolvedSuspenseBoundary fallback={pendingElement}>
         <ResolvedCatchBoundary
           resetKey={locationKey}
           errorComponent={errorComponent}
           onCatch={() => {
-            warning(false, `Error in route match: ${match.id}`)
+            warning(false, `Error in route match: ${matchId}`)
           }}
         >
-          <MatchInner match={match} pendingElement={pendingElement} />
+          <MatchInner matchId={matchId} pendingElement={pendingElement} />
         </ResolvedCatchBoundary>
       </ResolvedSuspenseBoundary>
     </matchesContext.Provider>
   )
 }
 function MatchInner({
-  match,
+  matchId,
   pendingElement,
 }: {
-  match: RouteMatch
+  matchId: string
   pendingElement: any
 }): any {
-  const { options, routesById } = useRouter()
-  const route = routesById[match.routeId]!
+  const router = useRouter()
+  // const unsafeMatch
+  const match = useRouterState({
+    select: (s) =>
+      pick(s.matches.find((d) => d.id === matchId)!, [
+        'status',
+        'error',
+        // 'showPending',
+        'loadPromise',
+        'routeId',
+      ]),
+  })
+
+  console.log(matchId, useDiffedValue(match))
+
+  const route = router.routesById[match.routeId]!
 
   if (match.status === 'error') {
     throw match.error
   }
 
   if (match.status === 'pending') {
-    if (match.showPending) {
-      return pendingElement || null
-    }
+    // if (match.showPending) {
+    //   return pendingElement || null
+    // }
     throw match.loadPromise
   }
 
   if (match.status === 'success') {
-    let comp = route.options.component ?? options.defaultComponent
+    let comp = route.options.component ?? router.options.defaultComponent
 
     if (comp) {
       return React.createElement(comp, {
@@ -197,13 +228,21 @@ function MatchInner({
 }
 
 export function Outlet() {
-  const matches = React.useContext(matchesContext).slice(1)
+  const router = useRouter()
+  const parentMatchId = React.useContext(matchesContext)
+  const parentMatchIdIndex = router.state.matches.findIndex(
+    (d) => d.id === parentMatchId,
+  )
 
-  if (!matches[0]) {
+  const nextMatchId = router.state.matches.find((d, i) => {
+    return i > parentMatchIdIndex
+  })?.id
+
+  if (!nextMatchId) {
     return null
   }
 
-  return <Match matches={matches} />
+  return <Match matchId={nextMatchId} />
 }
 
 export interface MatchRouteOptions {
@@ -302,14 +341,16 @@ export function useMatch<
     select?: (match: TRouteMatchState) => TSelected
   },
 ): TStrict extends true ? TSelected : TSelected | undefined {
-  const nearestMatch = React.useContext(matchesContext)[0]!
+  const router = useRouter()
+  const nearestMatchId = React.useContext(matchesContext)
+  const nearestMatch = router.state.matches.find((d) => d.id === nearestMatchId)
   const nearestMatchRouteId = nearestMatch?.routeId
 
   const matchRouteId = useRouterState({
     select: (state) => {
       const match = opts?.from
         ? state.matches.find((d) => d.routeId === opts?.from)
-        : state.matches.find((d) => d.id === nearestMatch.id)
+        : state.matches.find((d) => d.id === nearestMatchId)
 
       return match!.routeId
     },
@@ -332,7 +373,7 @@ export function useMatch<
     select: (state) => {
       const match = opts?.from
         ? state.matches.find((d) => d.routeId === opts?.from)
-        : state.matches.find((d) => d.id === nearestMatch.id)
+        : state.matches.find((d) => d.id === nearestMatchId)
 
       invariant(
         match,
@@ -350,7 +391,7 @@ export function useMatch<
   return matchSelection as any
 }
 
-export const matchesContext = React.createContext<RouteMatch[]>(null!)
+export const matchesContext = React.createContext<string>(null!)
 
 export function useMatches<T = RouteMatch[]>(opts?: {
   select?: (matches: RouteMatch[]) => T
@@ -360,7 +401,7 @@ export function useMatches<T = RouteMatch[]>(opts?: {
   return useRouterState({
     select: (state) => {
       const matches = state.matches.slice(
-        state.matches.findIndex((d) => d.id === contextMatches[0]?.id),
+        state.matches.findIndex((d) => d.id === contextMatches[0]),
       )
       return opts?.select ? opts.select(matches) : (matches as T)
     },

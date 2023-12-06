@@ -18,9 +18,10 @@ import {
   RouterOptions,
   RouterState,
 } from './router'
-import { NoInfer, PickAsRequired, useLayoutEffect } from './utils'
+import { NoInfer, PickAsRequired, pick, useLayoutEffect } from './utils'
 import { MatchRouteOptions } from './Matches'
 import { RouteMatch } from './Matches'
+import { useStore } from './useStore'
 
 export interface CommitLocationOptions {
   replace?: boolean
@@ -99,24 +100,22 @@ function RouterProviderInner<
   TRouteTree extends AnyRoute = RegisteredRouter['routeTree'],
   TDehydrated extends Record<string, any> = Record<string, any>,
 >({ router }: RouterProps<TRouteTree, TDehydrated>) {
-  const [preState, setState] = React.useState(() => router.state)
-  const [isTransitioning, startReactTransition] = React.useTransition()
-  const isAnyTransitioning =
-    isTransitioning || preState.matches.some((d) => d.status === 'pending')
-
-  const state = React.useMemo<RouterState<TRouteTree>>(
-    () => ({
-      ...preState,
-      status: isAnyTransitioning ? 'pending' : 'idle',
-      location: isTransitioning ? router.latestLocation : preState.location,
-      pendingMatches: router.pendingMatches,
-    }),
-    [preState, isTransitioning],
+  console.log('provider')
+  return (
+    <routerContext.Provider value={router}>
+      <Matches />
+      <Transitioner />
+    </routerContext.Provider>
   )
+}
 
-  router.setState = setState
-  router.state = state
+function Transitioner() {
+  const router = useRouter()
+  const routerState = useRouterState()
+  const [isTransitioning, startReactTransition] = React.useTransition()
+
   router.startReactTransition = startReactTransition
+  router.isTransitioning = isTransitioning
 
   const tryLoad = () => {
     startReactTransition(() => {
@@ -131,7 +130,7 @@ function RouterProviderInner<
   useLayoutEffect(() => {
     const unsub = router.history.subscribe(() => {
       router.latestLocation = router.parseLocation(router.latestLocation)
-      if (state.location !== router.latestLocation) {
+      if (routerState.location !== router.latestLocation) {
         tryLoad()
       }
     })
@@ -143,7 +142,7 @@ function RouterProviderInner<
       state: true,
     })
 
-    if (state.location.href !== nextLocation.href) {
+    if (routerState.location.href !== nextLocation.href) {
       router.commitLocation({ ...nextLocation, replace: true })
     }
 
@@ -153,33 +152,34 @@ function RouterProviderInner<
   }, [router.history])
 
   useLayoutEffect(() => {
-    if (!isTransitioning && state.resolvedLocation !== state.location) {
+    if (!window.__TSR_DEHYDRATED__) {
+      tryLoad()
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (
+      !isTransitioning &&
+      routerState.resolvedLocation !== routerState.location
+    ) {
       router.emit({
         type: 'onResolved',
-        fromLocation: state.resolvedLocation,
-        toLocation: state.location,
-        pathChanged: state.location!.href !== state.resolvedLocation?.href,
+        fromLocation: routerState.resolvedLocation,
+        toLocation: routerState.location,
+        pathChanged:
+          routerState.location!.href !== routerState.resolvedLocation?.href,
       })
+
       router.pendingMatches = []
 
-      setState((s) => ({
+      router.store.setState((s) => ({
         ...s,
         resolvedLocation: s.location,
       }))
     }
   })
 
-  useLayoutEffect(() => {
-    if (!window.__TSR_DEHYDRATED__) {
-      tryLoad()
-    }
-  }, [])
-
-  return (
-    <routerContext.Provider value={router}>
-      <Matches />
-    </routerContext.Provider>
-  )
+  return null
 }
 
 export function getRouteMatch<TRouteTree extends AnyRoute>(
@@ -194,9 +194,8 @@ export function useRouterState<
 >(opts?: {
   select: (state: RouterState<RegisteredRouter['routeTree']>) => TSelected
 }): TSelected {
-  const { state } = useRouter()
-  // return useStore(router.__store, opts?.select as any)
-  return opts?.select ? opts.select(state) : (state as any)
+  const router = useRouter()
+  return useStore(router.store, opts?.select as any)
 }
 
 export type RouterProps<

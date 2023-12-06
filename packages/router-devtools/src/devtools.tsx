@@ -7,6 +7,7 @@ import {
   AnyRootRoute,
   trimPath,
   useRouter,
+  useRouterState,
 } from '@tanstack/react-router'
 
 import useLocalStorage from './useLocalStorage'
@@ -338,16 +339,16 @@ export function TanStackRouterDevtools({
                     right: '0',
                   }
                 : position === 'top-left'
-                ? {
-                    left: '0',
-                  }
-                : position === 'bottom-right'
-                ? {
-                    right: '0',
-                  }
-                : {
-                    left: '0',
-                  }),
+                  ? {
+                      left: '0',
+                    }
+                  : position === 'bottom-right'
+                    ? {
+                        right: '0',
+                      }
+                    : {
+                        left: '0',
+                      }),
               ...closeButtonStyle,
             }}
           >
@@ -382,19 +383,19 @@ export function TanStackRouterDevtools({
                   right: '0',
                 }
               : position === 'top-left'
-              ? {
-                  top: '0',
-                  left: '0',
-                }
-              : position === 'bottom-right'
-              ? {
-                  bottom: '0',
-                  right: '0',
-                }
-              : {
-                  bottom: '0',
-                  left: '0',
-                }),
+                ? {
+                    top: '0',
+                    left: '0',
+                  }
+                : position === 'bottom-right'
+                  ? {
+                      bottom: '0',
+                      right: '0',
+                    }
+                  : {
+                      bottom: '0',
+                      left: '0',
+                    }),
             ...toggleButtonStyle,
           }}
         >
@@ -417,12 +418,13 @@ function RouteComp({
   setActiveRouteId: (id: string) => void
 }) {
   const router = useRouter()
+  const routerState = useRouterState()
   const matches =
-    router.state.status === 'pending'
-      ? router.state.pendingMatches
-      : router.state.matches
+    routerState.status === 'pending'
+      ? routerState.pendingMatches
+      : routerState.matches
 
-  const match = router.state.matches.find((d) => d.routeId === route.id)
+  const match = routerState.matches.find((d) => d.routeId === route.id)
 
   return (
     <div>
@@ -513,14 +515,15 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
   } = props
 
   const router = useRouter()
-  const matches = [...router.state.pendingMatches, ...router.state.matches]
+  const routerState = useRouterState()
+  const matches = [...routerState.pendingMatches, ...routerState.matches]
 
   invariant(
     router,
     'No router was found for the TanStack Router Devtools. Please place the devtools in the <RouterProvider> component tree or pass the router instance to the devtools manually.',
   )
 
-  // useStore(router.__store)
+  // useStore(router.store)
 
   const [showMatches, setShowMatches] = useLocalStorage(
     'tanstackRouterDevtoolsShowMatches',
@@ -537,7 +540,7 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
     [matches, activeRouteId],
   )
 
-  const hasSearch = Object.keys(router.state.location.search || {}).length
+  const hasSearch = Object.keys(routerState.location.search || {}).length
 
   // const preloadMatches = matches.filter((match) => {
   //   return (
@@ -707,7 +710,7 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
               }}
             >
               Pathname{' '}
-              {router.state.location.maskedLocation ? (
+              {routerState.location.maskedLocation ? (
                 <div
                   style={{
                     padding: '.1rem .5rem',
@@ -733,16 +736,16 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
                   opacity: 0.6,
                 }}
               >
-                {router.state.location.pathname}
+                {routerState.location.pathname}
               </code>
-              {router.state.location.maskedLocation ? (
+              {routerState.location.maskedLocation ? (
                 <code
                   style={{
                     color: theme.warning,
                     fontWeight: 'bold',
                   }}
                 >
-                  {router.state.location.maskedLocation.pathname}
+                  {routerState.location.maskedLocation.pathname}
                 </code>
               ) : null}
             </div>
@@ -804,9 +807,9 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
               />
             ) : (
               <div>
-                {(router.state.status === 'pending'
-                  ? router.state.pendingMatches
-                  : router.state.matches
+                {(routerState.status === 'pending'
+                  ? routerState.pendingMatches
+                  : routerState.matches
                 ).map((match, i) => {
                   return (
                     <div
@@ -1092,9 +1095,9 @@ export const TanStackRouterDevtoolsPanel = React.forwardRef<
               }}
             >
               <Explorer
-                value={router.state.location.search || {}}
+                value={routerState.location.search || {}}
                 defaultExpanded={Object.keys(
-                  (router.state.location.search as {}) || {},
+                  (routerState.location.search as {}) || {},
                 ).reduce((obj: any, next) => {
                   obj[next] = {}
                   return obj

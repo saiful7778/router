@@ -62,6 +62,7 @@ import {
 } from './path'
 import invariant from 'tiny-invariant'
 import { isRedirect } from './redirects'
+import { Store, createStore } from './useStore'
 // import warning from 'tiny-warning'
 
 //
@@ -236,7 +237,7 @@ export class Router<
   dehydratedData?: TDehydrated
 
   // Must build in constructor
-  state!: RouterState<TRouteTree>
+  store!: Store<RouterState<TRouteTree>>
   options!: PickAsRequired<
     RouterOptions<TRouteTree, TDehydrated>,
     'stringifySearch' | 'parseSearch' | 'context'
@@ -259,16 +260,6 @@ export class Router<
       stringifySearch: options?.stringifySearch ?? defaultStringifySearch,
       parseSearch: options?.parseSearch ?? defaultParseSearch,
     })
-  }
-
-  // These are default implementations that can optionally be overridden
-  // by the router provider once rendered. We provide these so that the
-  // router can be used in a non-react environment if necessary
-  startReactTransition: (fn: () => void) => void = (fn) => fn()
-  setState: (updater: NonNullableUpdater<RouterState<TRouteTree>>) => void = (
-    updater,
-  ) => {
-    this.state = functionalUpdate(updater, this.state)
   }
 
   update = (newOptions: RouterConstructorOptions<TRouteTree, TDehydrated>) => {
@@ -296,10 +287,40 @@ export class Router<
       this.buildRouteTree()
     }
 
-    if (!this.state) {
-      this.state = getInitialRouterState(this.latestLocation)
+    if (!this.store) {
+      this.store = createStore(
+        () => {
+          return getInitialRouterState(this.latestLocation)
+        },
+        {
+          onUpdate: (nextState) => {
+            const isAnyTransitioning =
+              this.isTransitioning ||
+              nextState.matches.some((d) => d.status === 'pending')
+
+            return {
+              ...nextState,
+              status: isAnyTransitioning ? 'pending' : 'idle',
+              location: this.isTransitioning
+                ? this.latestLocation
+                : nextState.location,
+              pendingMatches: this.pendingMatches,
+            }
+          },
+        },
+      )
     }
   }
+
+  get state() {
+    return this.store.getState()
+  }
+
+  // startReactTransition is a default implementations that can optionally be overridden
+  // by the router provider once rendered. We provide this so that the
+  // router can be used in a non-react environment if necessary
+  startReactTransition: (fn: () => void) => void = (fn) => fn()
+  isTransitioning = false
 
   buildRouteTree = () => {
     this.routesById = {} as RoutesById<TRouteTree>
@@ -1149,7 +1170,7 @@ export class Router<
           }
 
           if (!preload) {
-            this.setState((s) => ({
+            this.store.setState((s) => ({
               ...s,
               matches: s.matches.map((d) => (d.id === match.id ? match : d)),
             }))
@@ -1170,7 +1191,7 @@ export class Router<
                   showPending: true,
                 }
 
-                this.setState((s) => ({
+                this.store.setState((s) => ({
                   ...s,
                   matches: s.matches.map((d) =>
                     d.id === match.id ? match : d,
@@ -1223,7 +1244,7 @@ export class Router<
             }
 
             if (!preload) {
-              this.setState((s) => ({
+              this.store.setState((s) => ({
                 ...s,
                 matches: s.matches.map((d) => (d.id === match.id ? match : d)),
               }))
@@ -1275,7 +1296,7 @@ export class Router<
       const previousMatches = this.state.matches
 
       // Ingest the new matches
-      this.setState((s) => ({
+      this.store.setState((s) => ({
         ...s,
         // status: 'pending',
         location: next,
@@ -1284,6 +1305,7 @@ export class Router<
 
       try {
         try {
+          console.log('beforeLoad')
           // Load the matches
           await this.loadMatches({
             matches,
@@ -1294,6 +1316,7 @@ export class Router<
           // swallow this error, since we'll display the
           // errors on the route components
         }
+        console.log('afterLoad')
 
         // Only apply the latest transition
         if ((latestPromise = this.checkLatest(promise))) {
@@ -1633,7 +1656,7 @@ export class Router<
       return match
     })
 
-    this.setState((s) => {
+    this.store.setState((s) => {
       return {
         ...s,
         matches: matches as any,
