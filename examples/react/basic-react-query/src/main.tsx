@@ -28,7 +28,7 @@ type PostType = {
 
 const fetchPosts = async () => {
   console.log('Fetching posts...')
-  await new Promise((r) => setTimeout(r, 500))
+  await new Promise((r) => setTimeout(r, 1000))
   return axios
     .get<PostType[]>('https://jsonplaceholder.typicode.com/posts')
     .then((r) => r.data.slice(0, 10))
@@ -36,7 +36,7 @@ const fetchPosts = async () => {
 
 const fetchPost = async (postId: string) => {
   console.log(`Fetching post with id ${postId}...`)
-  await new Promise((r) => setTimeout(r, 500))
+  await new Promise((r) => setTimeout(r, 1000))
   const post = await axios
     .get<PostType>(`https://jsonplaceholder.typicode.com/posts/${postId}`)
     .then((r) => r.data)
@@ -52,6 +52,7 @@ const rootRoute = rootRouteWithContext<{
   queryClient: QueryClient
 }>()({
   component: RootComponent,
+  pendingComponent: () => <div>Loading... (You shouldn't see this)</div>,
 })
 
 function RootComponent() {
@@ -166,6 +167,7 @@ const postRoute = new Route({
   getParentRoute: () => postsRoute,
   path: '$postId',
   errorComponent: PostErrorComponent,
+
   loader: ({ context: { queryClient }, params: { postId } }) =>
     queryClient.ensureQueryData(postQueryOptions(postId)),
   component: PostRouteComponent,

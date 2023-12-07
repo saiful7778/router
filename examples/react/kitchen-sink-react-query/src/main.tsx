@@ -95,6 +95,7 @@ function RootComponent() {
 
   return (
     <>
+      {/* <pre className="text-xs">{JSON.stringify(state, null, 2)}</pre> */}
       <div className={`min-h-screen flex flex-col`}>
         <div className={`flex items-center border-b gap-2`}>
           <h1 className={`text-3xl p-2`}>Kitchen Sink</h1>
@@ -127,7 +128,6 @@ function RootComponent() {
                         // exact: to === '.',
                       }
                     }
-                    preload="intent"
                     className={`block py-2 px-3 text-blue-700`}
                     // Make "active" links bold
                     activeProps={{ className: `font-bold` }}
@@ -285,7 +285,6 @@ function InvoicesComponent() {
                 params={{
                   invoiceId: invoice.id,
                 }}
-                preload="intent"
                 className="block py-2 px-3 text-blue-700"
                 activeProps={{ className: `font-bold` }}
               >
@@ -1004,7 +1003,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <RouterProvider
           router={router}
-          defaultPreload="intent"
+          // defaultPreload="intent"
           defaultPendingMs={pendingMs}
           defaultPendingMinMs={pendingMinMs}
           context={{

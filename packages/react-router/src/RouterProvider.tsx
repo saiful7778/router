@@ -18,7 +18,7 @@ import {
   RouterOptions,
   RouterState,
 } from './router'
-import { NoInfer, PickAsRequired, pick, useLayoutEffect } from './utils'
+import { NoInfer, useLayoutEffect } from './utils'
 import { MatchRouteOptions } from './Matches'
 import { RouteMatch } from './Matches'
 import { useStore } from './useStore'
@@ -100,7 +100,6 @@ function RouterProviderInner<
   TRouteTree extends AnyRoute = RegisteredRouter['routeTree'],
   TDehydrated extends Record<string, any> = Record<string, any>,
 >({ router }: RouterProps<TRouteTree, TDehydrated>) {
-  console.log('provider')
   return (
     <routerContext.Provider value={router}>
       <Matches />
@@ -118,13 +117,20 @@ function Transitioner() {
   router.isTransitioning = isTransitioning
 
   const tryLoad = () => {
-    startReactTransition(() => {
+    const inner = () => {
       try {
         router.load()
       } catch (err) {
         console.error(err)
       }
-    })
+    }
+
+    if (router.shouldStartTransition) {
+      router.isTransitioning = true
+      startReactTransition(() => inner())
+    }
+
+    router.shouldStartTransition = true
   }
 
   useLayoutEffect(() => {

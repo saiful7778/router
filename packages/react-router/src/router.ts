@@ -235,9 +235,11 @@ export class Router<
   pendingMatches: AnyRouteMatch[] = []
   injectedHtml: InjectedHtmlEntry[] = []
   dehydratedData?: TDehydrated
+  shouldStartTransition = true
 
   // Must build in constructor
   store!: Store<RouterState<TRouteTree>>
+  state!: RouterState<TRouteTree>
   options!: PickAsRequired<
     RouterOptions<TRouteTree, TDehydrated>,
     'stringifySearch' | 'parseSearch' | 'context'
@@ -298,22 +300,19 @@ export class Router<
               this.isTransitioning ||
               nextState.matches.some((d) => d.status === 'pending')
 
-            return {
+            return (this.state = {
               ...nextState,
               status: isAnyTransitioning ? 'pending' : 'idle',
               location: this.isTransitioning
                 ? this.latestLocation
                 : nextState.location,
               pendingMatches: this.pendingMatches,
-            }
+            })
           },
         },
       )
+      this.state = this.store.getState()
     }
-  }
-
-  get state() {
-    return this.store.getState()
   }
 
   // startReactTransition is a default implementations that can optionally be overridden
@@ -894,18 +893,12 @@ export class Router<
         }
       }
 
-      const apply = () => {
-        this.history[next.replace ? 'replace' : 'push'](
-          nextHistory.href,
-          nextHistory.state,
-        )
-      }
+      this.shouldStartTransition = startTransition ?? true
 
-      if (startTransition ?? true) {
-        this.startReactTransition(apply)
-      } else {
-        apply()
-      }
+      this.history[next.replace ? 'replace' : 'push'](
+        nextHistory.href,
+        nextHistory.state,
+      )
     }
 
     this.resetNextScroll = next.resetScroll ?? true
@@ -1170,10 +1163,15 @@ export class Router<
           }
 
           if (!preload) {
-            this.store.setState((s) => ({
-              ...s,
-              matches: s.matches.map((d) => (d.id === match.id ? match : d)),
-            }))
+            this.store.setState(
+              (s) => ({
+                ...s,
+                matches: s.matches.map((d) => (d.id === match.id ? match : d)),
+              }),
+              {
+                notify: false,
+              },
+            )
           }
 
           let didShowPending = false
@@ -1191,12 +1189,17 @@ export class Router<
                   showPending: true,
                 }
 
-                this.store.setState((s) => ({
-                  ...s,
-                  matches: s.matches.map((d) =>
-                    d.id === match.id ? match : d,
-                  ),
-                }))
+                this.store.setState(
+                  (s) => ({
+                    ...s,
+                    matches: s.matches.map((d) =>
+                      d.id === match.id ? match : d,
+                    ),
+                  }),
+                  {
+                    notify: false,
+                  },
+                )
                 resolve()
               })
             }
@@ -1244,10 +1247,17 @@ export class Router<
             }
 
             if (!preload) {
-              this.store.setState((s) => ({
-                ...s,
-                matches: s.matches.map((d) => (d.id === match.id ? match : d)),
-              }))
+              this.store.setState(
+                (s) => ({
+                  ...s,
+                  matches: s.matches.map((d) =>
+                    d.id === match.id ? match : d,
+                  ),
+                }),
+                {
+                  notify: false,
+                },
+              )
             }
 
             resolve()
@@ -1305,9 +1315,8 @@ export class Router<
 
       try {
         try {
-          console.log('beforeLoad')
           // Load the matches
-          await this.loadMatches({
+          matches = await this.loadMatches({
             matches,
             checkLatest: () => this.checkLatest(promise),
             invalidate: opts?.invalidate,
@@ -1316,7 +1325,6 @@ export class Router<
           // swallow this error, since we'll display the
           // errors on the route components
         }
-        console.log('afterLoad')
 
         // Only apply the latest transition
         if ((latestPromise = this.checkLatest(promise))) {
@@ -1333,12 +1341,12 @@ export class Router<
           this.pendingMatches.includes(id),
         )
 
-        // setState((s) => ({
-        //   ...s,
-        //   status: 'idle',
-        //   resolvedLocation: s.location,
-        //   matches,
-        // }))
+        this.store.setState((s) => ({
+          ...s,
+          // status: 'idle',
+          // resolvedLocation: s.location,
+          matches,
+        }))
 
         //
         ;(

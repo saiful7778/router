@@ -14,7 +14,7 @@ import {
   RoutePaths,
 } from './routeInfo'
 import { RegisteredRouter } from './router'
-import { NoInfer, StrictOrFrom, deepDiff, pick } from './utils'
+import { NoInfer, StrictOrFrom, pick } from './utils'
 
 export interface RouteMatch<
   TRouteTree extends AnyRoute = AnyRoute,
@@ -52,7 +52,9 @@ export function Matches() {
     select: (s) => s.matches[0]?.id ?? '',
   })
 
-  // const locationKey = useRouterState({ select: (s) => s.location.state.key })
+  const resetKey = useRouterState({
+    select: (s) => s.resolvedLocation.state.key,
+  })
 
   const route = routesById[rootRouteId]!
 
@@ -72,7 +74,7 @@ export function Matches() {
   return (
     <matchesContext.Provider value={matchId}>
       <CatchBoundary
-        // resetKey={locationKey}
+        resetKey={resetKey}
         errorComponent={errorComponent}
         onCatch={() => {
           warning(
@@ -91,20 +93,8 @@ function SafeFragment(props: any) {
   return <>{props.children}</>
 }
 
-function useDiffedValue(value: any) {
-  const previousValueRef = React.useRef(value)
-
-  const diffed = deepDiff(previousValueRef.current, value)
-
-  React.useEffect(() => {
-    previousValueRef.current = value
-  })
-
-  return diffed
-}
-
 export function Match({ matchId }: { matchId: string }) {
-  const router = useRouter()
+  // const router = useRouter()
   const { options, routesById } = useRouter()
 
   const routeId = useRouterState({
@@ -112,8 +102,7 @@ export function Match({ matchId }: { matchId: string }) {
   })
 
   const route = routesById[routeId]!
-  const locationKey = router.latestLocation.state?.key
-  // const locationKey = useRouterState().location.state?.key
+  const resetKey = useRouterState().resolvedLocation.state?.key
 
   const PendingComponent = (route.options.pendingComponent ??
     options.defaultPendingComponent) as any
@@ -158,7 +147,7 @@ export function Match({ matchId }: { matchId: string }) {
     <matchesContext.Provider value={matchId}>
       <ResolvedSuspenseBoundary fallback={pendingElement}>
         <ResolvedCatchBoundary
-          resetKey={locationKey}
+          resetKey={resetKey}
           errorComponent={errorComponent}
           onCatch={() => {
             warning(false, `Error in route match: ${matchId}`)
@@ -184,13 +173,11 @@ function MatchInner({
       pick(s.matches.find((d) => d.id === matchId)!, [
         'status',
         'error',
-        // 'showPending',
+        'showPending',
         'loadPromise',
         'routeId',
       ]),
   })
-
-  console.log(matchId, useDiffedValue(match))
 
   const route = router.routesById[match.routeId]!
 
@@ -199,9 +186,9 @@ function MatchInner({
   }
 
   if (match.status === 'pending') {
-    // if (match.showPending) {
-    //   return pendingElement || null
-    // }
+    if (match.showPending) {
+      return pendingElement || null
+    }
     throw match.loadPromise
   }
 
@@ -341,9 +328,11 @@ export function useMatch<
     select?: (match: TRouteMatchState) => TSelected
   },
 ): TStrict extends true ? TSelected : TSelected | undefined {
-  const router = useRouter()
+  // const router = useRouter()
   const nearestMatchId = React.useContext(matchesContext)
-  const nearestMatch = router.state.matches.find((d) => d.id === nearestMatchId)
+  const nearestMatch = useRouterState().matches.find(
+    (d) => d.id === nearestMatchId,
+  )
   const nearestMatchRouteId = nearestMatch?.routeId
 
   const matchRouteId = useRouterState({

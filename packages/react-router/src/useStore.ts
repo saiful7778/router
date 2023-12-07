@@ -3,7 +3,12 @@ import { NonNullableUpdater, functionalUpdate, shallow } from './utils'
 
 export type Store<T> = {
   getState: () => T
-  setState: (updater: NonNullableUpdater<T>) => void
+  setState: (
+    updater: NonNullableUpdater<T>,
+    opts?: {
+      notify?: boolean
+    },
+  ) => void
   subscribe: (listener: (state: T) => void) => () => void
 }
 
@@ -22,13 +27,20 @@ export const createStore = <T>(
     (nextState: T, prevState: T) => void | Promise<void>
   >()
 
-  const setState = (updater: NonNullableUpdater<T>) => {
+  const setState = (
+    updater: NonNullableUpdater<T>,
+    opts2?: {
+      notify?: boolean
+    },
+  ) => {
     const previousState = state
     state = functionalUpdate(updater, state)
     if (opts?.onUpdate) {
       state = opts.onUpdate(state, previousState)
     }
-    listeners.forEach((listener) => listener(state, previousState))
+    if (opts2?.notify ?? true) {
+      listeners.forEach((listener) => listener(state, previousState))
+    }
   }
 
   const getState = () => state
